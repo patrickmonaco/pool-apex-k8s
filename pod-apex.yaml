@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: DaemonSet     #Un pod par node
+metadata:
+  name: pod-apex
+  labels:
+    app: pod-apex
+spec:
+  selector:
+    matchLabels:
+      app: pod-apex
+  template:
+    metadata:
+      labels:
+        app: pod-apex
+    spec:
+      nodeSelector:
+        front: "true"  # Le pod sera déployé uniquement sur les nodes "Front"
+      restartPolicy: Always
+      containers:
+        - name: db
+          image: container-registry.oracle.com/database/free:latest
+          #image: 7ok7av38.c1.gra9.container-registry.ovh.net/library/free-apex
+          ports:
+            - containerPort: 1521
+          env:
+            - name: ORACLE_PWD
+              value: "xxxxxxxx"
+            - name: ORACLE_CHARACTERSET
+              value: "AL32UTF8"
+            - name: ENABLE_ARCHIVELOG
+              value: "false"
+            - name: ENABLE_FORCE_LOGGING
+              value: "false"
+          #volumeMounts:
+             #- name: db-setup
+               #mountPath: /opt/oracle/scripts/startup
+               #readOnly: true   
+              
+        - name: apex
+          image: container-registry.oracle.com/database/ords-developer:latest
+          # command: [ "tail", "-f", "/dev/null" ]  # Ceci empêche l'exécution du script de démarrage
+          ports:
+            - containerPort: 8181
+              name: apex
+          env:
+            - name: IGNORE_APEX
+              value: "FALSE"
+            - name: ORACLE_PWD
+              value: "xxxxxxxx"
+            - name: ORACLE_DB_HOST
+              value: "localhost"
+            - name: ORACLE_DB_PORT
+              value: "1521"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NODE_ORDER
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['node-order']
+          volumeMounts:
+            - name: ords-secret
+              mountPath: /opt/oracle/variables
+              readOnly: true
+            - name: ords-setup
+              mountPath: /ords-entrypoint.d
+              readOnly: true
+      volumes:
+        - name: ords-secret
+          secret:
+            secretName: ords-secret
+        - name: db-setup
+          configMap:
+            name: db-configmap
+        - name: ords-setup
+          configMap:
+            name: ords-configmap     

@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dbmain
+spec:
+  selector:
+    matchLabels:
+      app: dbmain
+  serviceName: "dbmain"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: dbmain
+    spec:
+      nodeSelector:
+        back: "true"  # S'assure que le Pod tourne sur un node spécifique
+      containers:
+        - name: dbmain
+          image: container-registry.oracle.com/database/free:latest
+          ports:
+            - containerPort: 1521
+          env:
+            - name: ORACLE_PWD
+              value: "xxxxxxxx"
+            - name: ORACLE_CHARACTERSET
+              value: "AL32UTF8"
+            - name: ENABLE_ARCHIVELOG
+              value: "false"
+            - name: ENABLE_FORCE_LOGGING
+              value: "false"
+          volumeMounts:
+            - name: db-startup
+              mountPath: /opt/oracle/scripts/startup
+              readOnly: true      
+      volumes:
+        - name: db-startup
+          configMap:
+            name: db-configmap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dbmain
+spec:
+  selector:
+    app: dbmain
+  ports:
+    - port: 1521
+      targetPort: 1521
+  clusterIP: None  # Permet une découverte automatique entre Pods du StatefulSet
